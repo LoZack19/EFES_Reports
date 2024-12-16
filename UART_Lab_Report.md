@@ -1,5 +1,9 @@
 # UART Lab Report
 
+- Group B14
+- Giovanni Zaccaria
+- ...
+
 ## Lab 2 - UART Software
 
 The **goal** of the UART Software laboratory was to design a driver which implments the UART protocol to handle UART communication through GPIO pins.
