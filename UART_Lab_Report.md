@@ -201,19 +201,17 @@ volatile uint32_t *const DIVISOR = (void *)0x08001070;
 The **goal** of project one was simply to read from the `EXDATA`, `TXDATA`, `STATUS`, `CONTROL` and `DIVISOR` values and printed their values onto `stdout`. To accomplish this, we wrote the following program:
  
 ```c
-#ifdef PROJECT1
-int main() {
-    printf("rxdata: 0x%08lx\n", *RXDATA);
-    printf("txdata: 0x%08lx\n", *TXDATA);
-    printf("status: 0x%08lx\n", *STATUS);
-    printf("control: 0x%08lx\n", *CONTROL);
-    printf("divisor: 0x%08lx\n", *DIVISOR);
+    int main() {
+        printf("rxdata: 0x%08lx\n", *RXDATA);
+        printf("txdata: 0x%08lx\n", *TXDATA);
+        printf("status: 0x%08lx\n", *STATUS);
+        printf("control: 0x%08lx\n", *CONTROL);
+        printf("divisor: 0x%08lx\n", *DIVISOR);
 
-    for (;;);
+        for (;;);
 
-    return 0;
-}
-#endif
+        return 0;
+    }
 ```
 
 Which generated the following output after execution:
@@ -228,7 +226,7 @@ Which generated the following output after execution:
 
 In decimal, the value of the divisor register is $434$.
 
-## Project 2 - Computing the `DIVISOR` register
+### Project 2 - Computing the `DIVISOR` register
 
 The **goal** of this project was to compute the value of the `DIVISOR` register to get a baud rate of $115200$ from a clock frequency of $50 MHz$.  
 
@@ -244,12 +242,64 @@ This number matches the one we found inside the `DIVISOR` register in the previo
 The second point of this exercise asked us to compute the value of `DIVISOR` to set a baud rate of $2400$. By using the same formula we got $20832.33$ which we rounded to $20832$. The following code demonstrates the update of the `DIVISOR` register is performed.
 
 ```c
-#ifdef PROJECT2
-int main() {
-	printf("divisor: 0x%08lx\n", *DIVISOR);
-	*DIVISOR = 20832;
-	printf("divisor: 0x%08lx\n", *DIVISOR);
-	for (;;);
-}
-#endif
+    int main() {
+        printf("divisor: 0x%08lx\n", *DIVISOR);
+        *DIVISOR = 20832;
+        printf("divisor: 0x%08lx\n", *DIVISOR);
+        for (;;);
+    }
 ```
+
+### Project 3
+
+The **goal** of this lab was to 
+1. Write a character to the terminal and print the value of the `STATUS` register immediately before and after the transmission. 
+2. Modify the program to make two consecutive writes of the `TXDATA` register, and document the value of the `STATUS` register before and after the transmissions. 
+3. Do the same thing as point 2 except for the fact that we should send 3 consecutive characters instead of two.
+
+```c
+    int main() {
+        uint8_t *msg = "msg";
+        uint32_t status_before, status_after;
+
+        *DIVISOR = 20832;
+
+        for (uint8_t *c; *c != '\0'; c++) {
+            status_before = *STATUS;
+            *TXDATA = *c;
+            status_after = *STATUS;
+
+            printf("status before: 0x%08lx\n", status_before);
+            printf("status after: 0x%08lx\n", status_after);
+        }
+
+        for (;;);
+    }
+```
+
+For a single consecutive character the final result is:
+
+```
+status before: 0x00000060
+status after: 0x00000040
+```
+
+Action: bit `TMT` is cleared. This is because the sending buffer is filled with the data to transmit. `TRDY` is still set, because the `TXDATA` is ready to accept new data as soon as the previously written data enters the buffer.
+
+For two consecutive characters the final result is:
+
+```
+status before: 0x00000040
+status after: 0x00000000
+```
+
+Action: bit `TRDY` is cleared. This is because the sending buffer is filled with the first data to transmit, and now `TXDATA` stores the second character to transmit.
+
+For three consecutive characters the final result is:
+
+```
+status before: 0x00000000
+status after: 0x00000010
+```
+
+Action: bit `TOE` is set. This is because by writing to `TXDATA` before `TRDY` is set causes a loss of the second data to transmit.
