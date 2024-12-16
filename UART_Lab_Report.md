@@ -300,10 +300,10 @@ For three consecutive characters the final result is:
 
 ```
 status before: 0x00000000
-status after: 0x00000010
+status after: 0x00000110
 ```
 
-Action: bit `TOE` is set. This is because by writing to `TXDATA` before `TRDY` is set causes a loss of the second data to transmit.
+Action: bit `TOE` is set. Also bit `E`, to indicate that an error occurred. This is because by writing to `TXDATA` before `TRDY` is set causes a loss of the second data to transmit.
 
 ### Project 4 - Writing through UART
 
@@ -356,3 +356,194 @@ $$
 $$
 
 Thus the EBR is $223.26$ instead of the desired $300$.
+
+### Project 5 - Receiving over UART
+
+#### Part one - Implementing reception
+The **goal** of this part was to write a program that received characters over UART by reading their ASCII values from the `RXDATA` register and print them to `stdout`. To achieve this, we wrote the following program:
+
+```c 
+int main() {
+    uint8_t reading;
+    uint32_t status_before, status_after;
+
+    *DIVISOR = 20832;
+    *CONTROL &= ~(uint32_t)0b11111111;
+    *STATUS &= ~(uint32_t)0b100011111;
+
+    for (;;) {
+        if (BIT(*STATUS, RRDY)) {
+            status_before = *STATUS;
+            reading = (uint8_t)*RXDATA;
+            status_after = *STATUS;
+
+            printf("status before: 0x%08lx\n", status_before);
+            printf("%c\n", reading);
+            printf("status after: 0x%08lx\n", status_after);
+        }
+    }
+}
+```
+
+To begin, we clear the `CONTROL` register to disable interrupts and reset the `STATUS` register to avoid reading an incorrect value that might have been stored before the program started.
+
+#### Part two - Breaking the protocol
+
+The **goal** of this part was to study the behavior of the peripheral when the ready bit is not tested. To achieve this, we removed the ready check of part one before reading `RXDATA` as instructed:
+
+```c 
+int main() { 
+    uint8_t reading; 
+    uint32_t status_before, status_after; 
+
+    *DIVISOR = 20832; 
+    *CONTROL &= ~(uint32_t)0b11111111; 
+
+    for (;;) { 
+        reading = (uint8_t) *RXDATA; 
+        putc(reading, stdout); 
+    } 
+} 
+```
+
+When reading data from the `RXDATA` register, we repeatedly read the same value until a new character was transmitted, but other than that nothing noteworthy occurred. This happened because, when reading from `RXDATA`, the `RRDY` bit is automatically cleared by the peripheral. But since the printing function is not gated behind a test of the `RRDY` bit, we can't notice it.
+
+#### Part three - Triggering receive overrun
+
+The **goal** of this exercise is to implement a program that receives characters over UART, and introduces a delay between character reads. If the delay is too big, we expect to see the `ROE` bit triggered.
+
+```c 
+// Waits for the specified amount of microseconds
+void wait_us(uint32_t time_us) {
+    uint32_t tps = alt_timestamp_freq();
+    uint32_t nticks = tps / 1000000 * time_us;
+
+    alt_timestamp_start();
+    while (alt_timestamp() < nticks);
+}
+
+int main() {
+    uint8_t reading;
+    uint32_t status_before, status_after;
+
+    *DIVISOR = 20832;
+    *CONTROL &= ~(uint32_t)0b11111111;
+    *STATUS &= ~(uint32_t)0b100011111;
+
+    for (;;) {
+        if (BIT(*STATUS, RRDY)) {
+            status_before = *STATUS;
+            reading = (uint8_t)*RXDATA;
+            status_after = *STATUS;
+
+            printf("status before: 0x%08lx\n", status_before);
+            printf("reading: %c\n", reading);
+            printf("status after: 0x%08lx\n", status_after);
+
+            // 1 second delay
+            wait_us(1000000);
+        }
+    }
+}
+``` 
+
+With a $1s$ delay, the receive overrun was easy to trigger by pressing keys on the terminal with a period smaller than 1 second. Following we left an example output, obtained by ripetitively pressing `a` at a high rate:
+
+```
+status before: 0x000000D0
+reading: a
+status after: 0x00000060
+status before: 0x000001D8
+reading: a
+status after: 0x00000168
+```
+
+The first reading of `a` clears the `RRDY` flag, after which many characters try to fill the receive buffer while the code busy waits. After one second, the receive buffer is read again. `RRDY` is again set, but this time `ROE` and `E` are set to, to indicate that a receive overrun has occurred.
+
+ 
+### Project 6 - Transmitting at the maximum baud rate
+
+For project 6, we simply adjusted the divisor in order to be able to handle a baud rate of $115200$: 
+
+```c 
+int main() {
+    const uint32_t BAUD_RATE = 115200;
+
+    uint8_t reading;
+    uint32_t status_before, status_after;
+
+    *DIVISOR = 50000000 / BAUD_RATE - 1;
+    *CONTROL &= ~(uint32_t)0b11111111;
+    *STATUS &= ~(uint32_t)0b100011111;
+
+    for (;;) {
+        if (BIT(*STATUS, RRDY)) {
+            status_before = *STATUS;
+            reading = (uint8_t)*RXDATA;
+            status_after = *STATUS;
+
+            printf("status before: 0x%08lx\n", status_before);
+            putc(reading, stdout);
+            putc('\n', stdout);
+            printf("status after: 0x%08lx\n", status_after);
+        }
+    }
+} 
+```
+
+The transmission was much faster, but other tan that nothing happened. We didn't use the oscilloscope here for a question of time.
+
+### Project 10 - Implementing imterrupts
+
+For project 10 we had to implement interrupts for handling the peripheral. In particular this time we configured the control register to generate interrupts on receive ready. After that, we registerd the `void uart_isr(void *context)` interrupt service routine to handle reception. It tests for the receive ready bit, and then it reads a character from the receive register and it retransmits it to the transmit register.
+
+The main simply counts on the 7-segment display up to `0xFFFFFF`. Unfortunately, despite our best efforts, we could not get the interrupt to work.
+ 
+```c 
+uint32_t *const UART0_BASE = (void *)0x08001060;
+const uint32_t RXDATA_OFF = 0;
+const uint32_t TXDATA_OFF = 1;
+const uint32_t STATUS_OFF = 2;
+const uint32_t CONTROL_OFF = 3;
+const uint32_t DIVISOR_OFF = 4;
+
+void uart_isr(void *context) {
+    printf("Interrupt triggered\n");
+    IOWR_ALTERA_AVALON_PIO_DATA(NIOS_HEADER_CONN_BASE, 1);
+    uint32_t *uart_base = *(uint32_t **)context;
+
+    uint32_t status = *(uart_base + STATUS_OFF);
+    if (!BIT(status, RRDY) || !BIT(status, TRDY)) {
+        return;
+    }
+
+    uint8_t reading = *(uart_base + RXDATA_OFF);
+    *(uart_base + TXDATA_OFF) = reading;
+    IOWR_ALTERA_AVALON_PIO_DATA(NIOS_HEADER_CONN_BASE, 0);
+}
+
+// Waits for the specified amount of microseconds
+void wait_us(uint32_t time_us) {
+    uint32_t tps = alt_timestamp_freq();
+    uint32_t nticks = tps / 1000000 * time_us;
+
+    alt_timestamp_start();
+    while (alt_timestamp() < nticks);
+}
+
+int main() {
+    const uint32_t BAUD_RATE = 9600;
+
+    *DIVISOR = 50000000 / BAUD_RATE - 1;
+    *CONTROL &= ~(uint32_t)0b11111111;
+    *STATUS &= ~(uint32_t)0b100011111;
+
+    alt_ic_isr_register(0, UART_0_IRQ, uart_isr, (void *)(&UART0_BASE), NULL);
+    *CONTROL |= 0x80;
+
+    for (uint32_t count = 0;; count = (count + 1) & 0xFFFFFF) {
+        IOWR_ALTERA_AVALON_PIO_DATA(NIOS_7SEG_BASE, count);
+        wait_us(500000);
+    }
+}
+```
