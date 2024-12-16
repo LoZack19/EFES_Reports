@@ -88,7 +88,7 @@ We also connected pin 2 of the left header connector to an oscilloscope (and use
 
 It can be seen that the start character (0) is followed by the LSB of the character (1). The MSB of the character (0) is followed by an end character (1), after which the line returns to an idle state.
  
-### Project 4 - Implementing UART receiver in software
+##\ Project 4 - Implementing UART receiver in software
 
 The **goal** of this project was to implement a software version of UART. With a similar setup to that of project 3, we flashed the following program into the SoC: 
  
@@ -349,10 +349,10 @@ Above you can find respectively the first and last frame in which data was recei
 - Last: 28.23s
 - Duration: 19.65s
 
-The Effective Baud Rate (EBR) is the ratio between the characters sent and the time it took to send them. It is always lower or equal to the Baud Rate (BR):
+The Effective Baud Rate ($\text{EBR}$) is the ratio between the characters sent ($N$) and the time it took to send them ($T$). It is always lower or equal to the Baud Rate ($\text{BR}$):
 
 $$
-    \mathrm{EBR} = \frac{\# \mathrm{chars}}{\mathrm{duration}} \le \mathrm{BR}
+    \mathrm{EBR} = \frac{\mathrm{N}}{\mathrm{T}} \le \mathrm{BR}
 $$
 
 Thus the EBR is $223.26$ instead of the desired $300$.
