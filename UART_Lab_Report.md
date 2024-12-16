@@ -72,14 +72,15 @@ By connecting the oscilloscope probe to pin 1 of GPIO1 and GND we could see the 
 
 ![GPIO1(0) toggling](pics/lab2_proj2_oscilloscope.png)
 
-### Project 3 
-For project 3, we connected our computer with a USB mini type B connector to the DE1-SoC board, and we used PuTTY with the following parameters:
+### Project 3 - UART protocol through oscilloscope
 
-- Baud Rate: 300 
-- Bits per character: 8 
-- Parity: none 
-- Number of stop bits: 1 
-- Flow Control: None 
+The **goal** of project 3 was to send a character through UART to the board and show it through the oscilloscope. To achieve this, we connected our computer with a USB mini type B connector to the DE1-SoC board, and we used PuTTY with the following parameters:
+
+- Baud Rate: 300
+- Bits per character: 8
+- Parity: none
+- Number of stop bits: 1
+- Flow Control: None
 
 We also connected pin 2 of the left header connector to an oscilloscope (and used pin 5 of the VGA connector of the board as ground), which was then set to trigger on the falling edge of the signal. After connecting PuTTY to the appropriate COM port, we tried sending, among other characters, the character `0x55` (i.e. `0b01010101`), whose waveform can be seen below: 
  
@@ -178,22 +179,22 @@ We changed the baud rate of the program developed for the previous project, and 
 The setup for the third laboratory was almost identical to that of the second one. In this laboratory we defined some global variables and macros which are shared among all projects, to make the code more readable.
 
 ```c
-#include <stdint.h>
-#include <stdio.h>
+    #include <stdint.h>
+    #include <stdio.h>
 
-#include "altera_avalon_pio_regs.h"
-#include "sys/alt_timestamp.h"
-#include "system.h"
+    #include "altera_avalon_pio_regs.h"
+    #include "sys/alt_timestamp.h"
+    #include "system.h"
 
-#define BIT(REG, N) ((REG) & (1 << (N)))
-#define TRDY 6
-#define RRDY 7
+    #define BIT(REG, N) ((REG) & (1 << (N)))
+    #define TRDY 6
+    #define RRDY 7
 
-volatile uint32_t *const RXDATA = (void *)0x08001060;
-volatile uint32_t *const TXDATA = (void *)0x08001064;
-volatile uint32_t *const STATUS = (void *)0x08001068;
-volatile uint32_t *const CONTROL = (void *)0x0800106C;
-volatile uint32_t *const DIVISOR = (void *)0x08001070;
+    volatile uint32_t *const RXDATA = (void *)0x08001060;
+    volatile uint32_t *const TXDATA = (void *)0x08001064;
+    volatile uint32_t *const STATUS = (void *)0x08001068;
+    volatile uint32_t *const CONTROL = (void *)0x0800106C;
+    volatile uint32_t *const DIVISOR = (void *)0x08001070;
 ```
 
 ### Project 1 - Reading peripheral registers
@@ -250,7 +251,7 @@ The second point of this exercise asked us to compute the value of `DIVISOR` to 
     }
 ```
 
-### Project 3
+### Project 3 - Behavior of the `STATUS` register
 
 The **goal** of this lab was to 
 1. Write a character to the terminal and print the value of the `STATUS` register immediately before and after the transmission. 
@@ -303,3 +304,55 @@ status after: 0x00000010
 ```
 
 Action: bit `TOE` is set. This is because by writing to `TXDATA` before `TRDY` is set causes a loss of the second data to transmit.
+
+### Project 4 - Writing through UART
+
+#### Part one - Sending a string
+
+The **goal** of the first part of project 4 was to write a Nios II program that sends the string `"My name is ..."` over UART. To accomplish this we wrote the following program: 
+ 
+```c 
+    void UART_write(char *msg) {
+        for (char *c = msg; *c != '\0'; c++) {
+            while (!BIT(*STATUS, TRDY));
+            *TXDATA = *c;
+        }
+    }
+
+    int main() {
+        *DIVISOR = 20832;
+
+        UART_write("Hello my name is Claudio\n\r");
+
+        for (;;);
+    }
+``` 
+
+Here is a picture of the entire comunication, seen through the oscilloscope:
+ 
+![Hello my name is Claudio](pics\lab3_proj4.1.png)
+ 
+For the sake of brevity, on the following sections we will also ommit the definition of the `UART_write` function. 
+ 
+#### Part Two - Sending a long string
+
+The **goal** of this part was to send a very long string through UART at a slower baud rate to measure the effective baud rate of the ransmission.
+
+To achieve this, we fed the terminal with an excerpt of _De Rerum Natura_, written by the latin poet _Lucretius_. The string contained $4387$ characters. We timed it by registering a chronometer and the monitor receiving the string with a slow motion video.
+ 
+![First frame](pics\lab3_proj4.2_first_frame.png)
+![Last frame](pics\lab3_proj4.2_last_frame.png)
+ 
+Above you can find respectively the first and last frame in which data was received.
+
+- First: 8.58s
+- Last: 28.23s
+- Duration: 19.65s
+
+The Effective Baud Rate (EBR) is the ratio between the characters sent and the time it took to send them. It is always lower or equal to the Baud Rate (BR):
+
+$$
+    \mathrm{EBR} = \frac{\# \mathrm{chars}}{\mathrm{duration}} \le \mathrm{BR}
+$$
+
+Thus the EBR is $223.26$ instead of the desired $300$.
