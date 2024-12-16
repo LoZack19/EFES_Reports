@@ -84,7 +84,7 @@ The **goal** of project 3 was to send a character through UART to the board and 
 
 We also connected pin 2 of the left header connector to an oscilloscope (and used pin 5 of the VGA connector of the board as ground), which was then set to trigger on the falling edge of the signal. After connecting PuTTY to the appropriate COM port, we tried sending, among other characters, the character `0x55` (i.e. `0b01010101`), whose waveform can be seen below: 
  
-![Input 0x55 to UART](pics\lab2_proj3_input0x55.png)
+![Input 0x55 to UART](pics/lab2_proj3_input0x55.png)
 
 It can be seen that the start character (0) is followed by the LSB of the character (1). The MSB of the character (0) is followed by an end character (1), after which the line returns to an idle state.
  
@@ -330,7 +330,7 @@ The **goal** of the first part of project 4 was to write a Nios II program that 
 
 Here is a picture of the entire comunication, seen through the oscilloscope:
  
-![Hello my name is Claudio](pics\lab3_proj4.1.png)
+![Hello my name is Claudio](pics/lab3_proj4.1.png)
  
 For the sake of brevity, on the following sections we will also ommit the definition of the `UART_write` function. 
  
@@ -340,8 +340,8 @@ The **goal** of this part was to send a very long string through UART at a slowe
 
 To achieve this, we fed the terminal with an excerpt of _De Rerum Natura_, written by the latin poet _Lucretius_. The string contained $4387$ characters. We timed it by registering a chronometer and the monitor receiving the string with a slow motion video.
  
-![First frame](pics\lab3_proj4.2_first_frame.png)
-![Last frame](pics\lab3_proj4.2_last_frame.png)
+![First frame](pics/lab3_proj4.2_first_frame.png)
+![Last frame](pics/lab3_proj4.2_last_frame.png)
  
 Above you can find respectively the first and last frame in which data was received.
 
