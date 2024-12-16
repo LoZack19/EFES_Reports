@@ -1,8 +1,10 @@
 # UART Lab Report
 
+## Lab 2 - UART Software
+
 The **goal** of the UART Software laboratory was to design a driver which implments the UART protocol to handle UART communication through GPIO pins.
 
-## Project 1 - Environment Configuration
+### Project 1 - Environment Configuration
 
 The **goal** of this project was to write a working hello world project in C running on the Nios II processor by using the `printf()` function, in order to check wether the environment worked correctly before starting to work on the actual assignments.
 
@@ -16,7 +18,7 @@ The third step was to configure the Board Support Package (BSP) correctly throug
 - `sys_clk_timer` set to `none`
 - `timestamp_timer` set to `timer_0`
 
-After this, it was possible to generate the BSP.
+We had to disable the BSP UART driver, because it would have interferred with our code. After this step, it was possible to generate the BSP.
 
 We built the whole project with the following `main()` function.
 
@@ -28,7 +30,7 @@ int main() {
 }
 ```
 
-## Project 2 - Experimenting with GPIO pins
+### Project 2 - Experimenting with GPIO pins
 
 The **goal** of this project was simply to periodically complement the logic value on a pin on the right header connector and display the result on the oscilloscope. 
  
@@ -70,7 +72,7 @@ By connecting the oscilloscope probe to pin 1 of GPIO1 and GND we could see the 
 
 ![GPIO1(0) toggling](pics/lab2_proj2_oscilloscope.png)
 
-## Project 3 
+### Project 3 
 For project 3, we connected our computer with a USB mini type B connector to the DE1-SoC board, and we used PuTTY with the following parameters:
 
 - Baud Rate: 300 
@@ -85,7 +87,7 @@ We also connected pin 2 of the left header connector to an oscilloscope (and use
 
 It can be seen that the start character (0) is followed by the LSB of the character (1). The MSB of the character (0) is followed by an end character (1), after which the line returns to an idle state.
  
-## Project 4 - Implementing UART receiver in software
+### Project 4 - Implementing UART receiver in software
 
 The **goal** of this project was to implement a software version of UART. With a similar setup to that of project 3, we flashed the following program into the SoC: 
  
@@ -163,4 +165,91 @@ The comments already outline what each part of the code does. It should be noted
 
 We provide the output of the program, which coincides to what we expected to see.
 
-![Output of the program](C:\Users\s346305\Desktop\lab2_uart\pics\lab2_proj3_output.png)
+![Output of the program](pics\lab2_proj3_output.png)
+
+### Project 5 - Testing higher baud rates
+
+We changed the baud rate of the program developed for the previous project, and the highest working standard baud rate we could obtain was 2400. Values higher than 2400 resulted in a protocol error, most probably because the speed of the Nios II processor couldn't catch up with high baud rates. To reach this value we optimized the code with `-O3`.
+
+## Lab 3 - UART Hardware
+
+### Setup
+
+The setup for the third laboratory was almost identical to that of the second one. In this laboratory we defined some global variables and macros which are shared among all projects, to make the code more readable.
+
+```c
+#include <stdint.h>
+#include <stdio.h>
+
+#include "altera_avalon_pio_regs.h"
+#include "sys/alt_timestamp.h"
+#include "system.h"
+
+#define BIT(REG, N) ((REG) & (1 << (N)))
+#define TRDY 6
+#define RRDY 7
+
+volatile uint32_t *const RXDATA = (void *)0x08001060;
+volatile uint32_t *const TXDATA = (void *)0x08001064;
+volatile uint32_t *const STATUS = (void *)0x08001068;
+volatile uint32_t *const CONTROL = (void *)0x0800106C;
+volatile uint32_t *const DIVISOR = (void *)0x08001070;
+```
+
+### Project 1 - Reading peripheral registers
+
+The **goal** of project one was simply to read from the `EXDATA`, `TXDATA`, `STATUS`, `CONTROL` and `DIVISOR` values and printed their values onto `stdout`. To accomplish this, we wrote the following program:
+ 
+```c
+#ifdef PROJECT1
+int main() {
+    printf("rxdata: 0x%08lx\n", *RXDATA);
+    printf("txdata: 0x%08lx\n", *TXDATA);
+    printf("status: 0x%08lx\n", *STATUS);
+    printf("control: 0x%08lx\n", *CONTROL);
+    printf("divisor: 0x%08lx\n", *DIVISOR);
+
+    for (;;);
+
+    return 0;
+}
+#endif
+```
+
+Which generated the following output after execution:
+
+```
+    rxdata: 0x00000000
+    txdata: 0x00000000
+    status: 0x00000060
+    control: 0x00000080
+    divisor: 0x000001b2
+```
+
+In decimal, the value of the divisor register is $434$.
+
+## Project 2 - Computing the `DIVISOR` register
+
+The **goal** of this project was to compute the value of the `DIVISOR` register to get a baud rate of $115200$ from a clock frequency of $50 MHz$.  
+
+$$
+    \begin{align}
+        f_\text{uart} &= \frac{f_\text{ck}}{\mathtt{DIV}+1} \\
+        \implies \mathtt{DIV} &= \frac{f_\text{ck}}{f_\text{uart}} - 1 = \frac{50 MHz}{115200 Hz} - 1 \simeq  433.0278
+    \end{align}
+$$
+ 
+This number matches the one we found inside the `DIVISOR` register in the previous project aside from the fact that it's ceiled instead of it being floored.
+
+The second point of this exercise asked us to compute the value of `DIVISOR` to set a baud rate of $2400$. By using the same formula we got $20832.33$ which we rounded to $20832$. The following code demonstrates the update of the `DIVISOR` register is performed.
+
+```c
+#ifdef PROJECT2
+int main() {
+	printf("divisor: 0x%08lx\n", *DIVISOR);
+	*DIVISOR = 20832;
+	printf("divisor: 0x%08lx\n", *DIVISOR);
+	for (;;);
+}
+#endif
+```
